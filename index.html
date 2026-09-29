@@ -73,6 +73,7 @@ header.top .sub{opacity:.85;font-size:12.5px;margin-top:2px;color:var(--gold2)}
 .btn-navy{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;flex:1}
 .btn-ghost{background:#f1ecdd;color:var(--navy);flex:1}
 .btn-danger{background:#fde8e8;color:#b91c1c;flex:1}
+.btn-wa{background:#1da851;color:#fff;flex:1}
 .btn-sm{padding:9px 12px;font-size:13.5px;border-radius:11px}
 textarea.wish{width:100%;min-height:170px;border:1.5px solid var(--line);border-radius:14px;
   padding:14px;font-size:15px;line-height:1.6;font-family:inherit;color:var(--ink);background:#fffdf7;resize:vertical}
@@ -168,6 +169,9 @@ nav.bottom button.on .ic{filter:drop-shadow(0 0 6px rgba(201,162,39,.6))}
       <button class="btn btn-gold" id="btnShareWish">📤 Share wish</button>
     </div>
     <div style="display:flex;gap:10px;margin-top:10px">
+      <button class="btn btn-wa" id="btnWhatsApp">💬 Send via WhatsApp</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:10px">
       <button class="btn btn-navy" id="btnToCard">🖼 Make a card →</button>
     </div>
   </div>
@@ -192,6 +196,7 @@ nav.bottom button.on .ic{filter:drop-shadow(0 0 6px rgba(201,162,39,.6))}
       <button class="btn btn-ghost" id="btnDlCard">⬇ Download</button>
       <button class="btn btn-gold" id="btnShareCard">📤 Share card</button>
     </div>
+    <p class="hint" style="margin-top:10px">Tip: tap <b>Share card</b>, then choose <b>WhatsApp</b> to send the card as a photo.</p>
   </div>
 </section>
 
@@ -657,6 +662,10 @@ $('btnNewWish').addEventListener('click',newWish);
 $('btnShareWish').addEventListener('click',function(){
   var t=$('wishText').value.trim(); if(!t){ toast('Generate a wish first'); return; }
   shareText(t,'Birthday wish');
+});
+$('btnWhatsApp').addEventListener('click',function(){
+  var t=$('wishText').value.trim(); if(!t){ toast('Generate a wish first'); return; }
+  window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank');
 });
 $('inpSign').addEventListener('input',function(){ settings.signature=this.value; saveSet(); });
 $('btnToCard').addEventListener('click',function(){
