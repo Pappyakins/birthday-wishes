@@ -29,6 +29,13 @@ header.top{background:linear-gradient(135deg,var(--navy),var(--navy2)); color:#f
   box-shadow:var(--shadow); position:sticky; top:0; z-index:20;}
 header.top .brand{display:flex;align-items:center;gap:12px}
 .app-logo{width:44px;height:44px;border-radius:14px;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.org-logo{width:44px;height:44px;border-radius:14px;object-fit:cover;margin-left:auto;
+  border:2px solid var(--gold);background:#fff;flex-shrink:0}
+.org-prev{width:64px;height:64px;border-radius:16px;object-fit:cover;border:2px solid var(--gold);
+  background:#fff;flex-shrink:0}
+.today-banner{background:linear-gradient(135deg,#c9a227,#a8861c);color:#fff;border-radius:16px;
+  padding:14px 16px;margin-bottom:12px;font-size:14.5px;line-height:1.55;box-shadow:var(--shadow)}
+.today-banner b{font-weight:800}
 header.top h1{margin:0;font-size:22px;letter-spacing:.3px}
 header.top .sub{opacity:.85;font-size:12.5px;margin-top:2px;color:var(--gold2)}
 .stat-row{display:flex;gap:10px;margin-top:14px}
@@ -134,6 +141,7 @@ nav.bottom button.on .ic{filter:drop-shadow(0 0 6px rgba(201,162,39,.6))}
   <div class="brand">
     <img class="app-logo" src="logo.png" alt="Birthday Wishes">
     <div><h1>Birthday Wishes</h1><div class="sub">Never miss a celebration</div></div>
+    <img id="orgLogo" class="org-logo" src="trem-logo.png" alt="Organization logo">
   </div>
   <div class="stat-row">
     <div class="stat"><div class="v" id="stTotal">0</div><div class="l">Birthdays</div></div>
@@ -145,6 +153,7 @@ nav.bottom button.on .ic{filter:drop-shadow(0 0 6px rgba(201,162,39,.6))}
 <!-- ============ UPCOMING ============ -->
 <section class="view active" id="view-upcoming">
   <input class="search" id="upSearch" type="text" placeholder="Search names…">
+  <div id="todayBanner" class="today-banner" style="display:none"></div>
   <div id="todaySec"></div>
   <div class="sec-title">Coming up</div>
   <div id="upList"></div>
@@ -213,6 +222,25 @@ nav.bottom button.on .ic{filter:drop-shadow(0 0 6px rgba(201,162,39,.6))}
     <input type="file" id="fileCsv" accept=".csv,text/csv" style="display:none">
   </div>
   <div class="card">
+    <h2>Organization</h2>
+    <div style="display:flex;gap:12px;align-items:center">
+      <img id="orgLogoPrev" class="org-prev" src="trem-logo.png" alt="Organization logo">
+      <div style="flex:1;min-width:0">
+        <input type="text" id="inpOrgName" placeholder="Organization name (e.g. TREM TORONTO)">
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-ghost btn-sm" id="btnLogoUpload">🖼 Upload logo</button>
+          <button class="btn btn-ghost btn-sm" id="btnLogoReset">↺ TREM logo</button>
+        </div>
+      </div>
+    </div>
+    <input type="file" id="fileLogo" accept="image/*" style="display:none">
+    <div class="hint" style="margin-top:12px;margin-bottom:0">Your logo appears in the header and on birthday cards. It stays on this device.</div>
+    <div class="toggle">
+      <div><div class="t-label">🎂 Birthday alerts</div><div class="t-sub">Remind me on days with birthdays</div></div>
+      <label class="switch"><input type="checkbox" id="tglAlerts"><span class="slider"></span></label>
+    </div>
+  </div>
+  <div class="card">
     <h2 id="formTitle">Add a birthday</h2>
     <label class="f">Name</label><input type="text" id="pName" placeholder="e.g. Sister Joy">
     <div class="grid2">
@@ -250,13 +278,58 @@ nav.bottom button.on .ic{filter:drop-shadow(0 0 6px rgba(201,162,39,.6))}
 /* ================= DATA ================= */
 var LS_KEY='bw_people_v1', LS_SET='bw_settings_v1';
 var people=[];
-var settings={verse:true, signature:'', cardStyle:'midnight', cardMsg:'Wishing you a beautiful year ahead, filled with joy, laughter and blessings.'};
+var settings={verse:true, signature:'', cardStyle:'midnight', cardMsg:'Wishing you a beautiful year ahead, filled with joy, laughter and blessings.', orgLogo:'', orgName:'', alerts:false};
 function loadAll(){
   try{ people=JSON.parse(localStorage.getItem(LS_KEY))||[]; }catch(e){ people=[]; }
   try{ var s=JSON.parse(localStorage.getItem(LS_SET))||{}; for(var k in s) settings[k]=s[k]; }catch(e){}
 }
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(people)); }
 function saveSet(){ localStorage.setItem(LS_SET, JSON.stringify(settings)); }
+
+/* ================= ORG BRANDING + ALERTS ================= */
+function orgLogoSrc(){ return settings.orgLogo||'trem-logo.png'; }
+function applyOrgBranding(){
+  var s=orgLogoSrc();
+  if($('orgLogo')) $('orgLogo').src=s;
+  if($('orgLogoPrev')) $('orgLogoPrev').src=s;
+}
+function loadImg(src){ return new Promise(function(res){ var i=new Image(); i.onload=function(){res(i);}; i.onerror=function(){res(null);}; i.src=src; }); }
+var _alertKey='';
+function refreshTodayAlert(){
+  var todays=withNext().filter(function(x){return x.du===0;});
+  var b=$('todayBanner');
+  if(b){
+    if(todays.length){
+      b.style.display='block';
+      b.innerHTML='🎂 <b>'+todays.length+' birthday'+(todays.length>1?'s':'')+' today:</b> '+todays.map(function(x){return esc(x.p.name);}).join(', ');
+    } else b.style.display='none';
+  }
+  var key=(settings.alerts?'1':'0')+'|'+todays.map(function(x){return x.p.id;}).join(',');
+  if(key!==_alertKey){ _alertKey=key; if(settings.alerts) scheduleAlerts(todays); else cancelAlerts(); }
+}
+function cancelAlerts(){
+  var p=cap(); if(p&&p.LocalNotifications){ try{ p.LocalNotifications.cancel({notifications:[{id:7}]}); }catch(e){} }
+}
+async function scheduleAlerts(todays){
+  var p=cap();
+  try{
+    if(p&&p.LocalNotifications){
+      var r=await p.LocalNotifications.requestPermissions();
+      if(r&&r.display==='granted'){
+        await p.LocalNotifications.cancel({notifications:[{id:7}]});
+        if(todays.length){
+          await p.LocalNotifications.schedule({notifications:[{
+            id:7, title:'🎂 Birthdays today',
+            body:todays.map(function(x){return x.p.name;}).join(', '),
+            schedule:{on:{hour:8,minute:0},repeats:true,allowWhileIdle:true}
+          }]});
+        }
+      }
+    } else if('Notification' in window && todays.length && Notification.permission==='granted'){
+      try{ new Notification('🎂 Birthdays today',{body:todays.map(function(x){return x.p.name;}).join(', ')}); }catch(e){}
+    }
+  }catch(e){}
+}
 function uid(){ return 'p'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36); }
 
 var WISHES=[
@@ -397,6 +470,7 @@ function renderUpcoming(){
   var t=all.filter(function(x){return x.du===0;}).length;
   var w=all.filter(function(x){return x.du>=0&&x.du<=7;}).length;
   $('stTotal').textContent=people.length; $('stToday').textContent=t; $('stWeek').textContent=w;
+  refreshTodayAlert();
 }
 function bdayRow(x,isToday){
   var age=turning(x.p,x.nb);
@@ -476,6 +550,14 @@ async function drawCard(){
   ctx.globalAlpha=1;
   ctx.strokeStyle=st.sub; ctx.lineWidth=8; ctx.strokeRect(36,36,W-72,H-72);
   ctx.lineWidth=2; ctx.strokeRect(62,62,W-124,H-124);
+  var _logo=await loadImg(orgLogoSrc());
+  if(_logo){
+    var _ls=120,_lx=W-76-_ls,_ly=92;
+    ctx.save(); ctx.fillStyle='#ffffff'; roundRect(ctx,_lx,_ly,_ls,_ls,26); ctx.fill();
+    var _k=Math.min((_ls-20)/_logo.width,(_ls-20)/_logo.height);
+    var _dw=_logo.width*_k,_dh=_logo.height*_k;
+    ctx.drawImage(_logo,_lx+(_ls-_dw)/2,_ly+(_ls-_dh)/2,_dw,_dh); ctx.restore();
+  }
   ctx.textAlign='center'; ctx.fillStyle=st.accent;
   var s1=fitFont(ctx,'Happy Birthday',W-260,130);
   ctx.font=s1+'px Allura, cursive';
@@ -705,8 +787,43 @@ $('btnExport').addEventListener('click',exportCSV);
 $('btnTemplate').addEventListener('click',function(){
   downloadFile('birthday-template.csv','name,month,day,year,notes\nAdaeze,10,2,1995,\nBro Emeka,11,14,,\n','text/csv');
 });
+$('btnLogoUpload').addEventListener('click',function(){ $('fileLogo').click(); });
+$('fileLogo').addEventListener('change',function(e){
+  var f=e.target.files[0]; if(!f) return;
+  var rd=new FileReader();
+  rd.onload=function(){
+    var img=new Image();
+    img.onload=function(){
+      try{
+        var sc=Math.min(1,256/Math.max(img.width,img.height));
+        var c=document.createElement('canvas'); c.width=Math.max(1,Math.round(img.width*sc)); c.height=Math.max(1,Math.round(img.height*sc));
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        settings.orgLogo=c.toDataURL('image/png'); saveSet(); applyOrgBranding(); toast('Logo updated');
+      }catch(err){ toast('That image is too large'); }
+    };
+    img.onerror=function(){ toast('Could not read image'); };
+    img.src=rd.result;
+  };
+  rd.readAsDataURL(f); e.target.value='';
+});
+$('btnLogoReset').addEventListener('click',function(){
+  settings.orgLogo=''; saveSet(); applyOrgBranding(); toast('Back to TREM logo');
+});
+$('inpOrgName').addEventListener('input',function(){ settings.orgName=this.value; saveSet(); });
+$('tglAlerts').addEventListener('change',function(){
+  settings.alerts=this.checked; saveSet();
+  if(this.checked){
+    var p=cap();
+    if(p&&p.LocalNotifications){ p.LocalNotifications.requestPermissions().then(function(){ refreshTodayAlert(); }); }
+    else if('Notification' in window && Notification.permission==='default'){ Notification.requestPermission(); }
+  }
+  refreshTodayAlert(); toast(this.checked?'Birthday alerts on':'Birthday alerts off');
+});
 loadAll();
+applyOrgBranding();
 $('tglVerse').checked=settings.verse!==false;
+$('tglAlerts').checked=settings.alerts===true;
+$('inpOrgName').value=settings.orgName||'';
 $('inpSign').value=settings.signature||'';
 $('cardMsg').value=settings.cardMsg||$('cardMsg').value;
 $('cardMsg').addEventListener('input',function(){ settings.cardMsg=this.value; saveSet(); });
