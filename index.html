@@ -308,7 +308,20 @@ function refreshTodayAlert(){
   if(key!==_alertKey){ _alertKey=key; if(settings.alerts) scheduleAlerts(todays); else cancelAlerts(); }
 }
 function cancelAlerts(){
-  var p=cap(); if(p&&p.LocalNotifications){ try{ p.LocalNotifications.cancel({notifications:[{id:7}]}); }catch(e){} }
+  var p=cap(); if(p&&p.LocalNotifications){ try{ p.LocalNotifications.cancel({notifications:[{id:7},{id:70}]}); }catch(e){} }
+}
+/* Heads-up birthday reminder: names + ages, on a high-importance channel
+   (new channel id "birthdays-high" so the v1.3 upgrade gets fresh IMPORTANCE_HIGH —
+   Android keeps an existing channel's original importance). */
+var BDAY_CH='birthdays-high', BDAY_ID=70;
+function bdayAlertBody(todays){
+  return todays.map(function(x){
+    var age=turning(x.p,x.nb);
+    return x.p.name+(age?' (turns '+age+')':'');
+  }).join(', ');
+}
+function bdayAlertTitle(todays){
+  return '🎂 Birthday today'+(todays.length>1?' ('+todays.length+')':'');
 }
 async function scheduleAlerts(todays){
   var p=cap();
@@ -316,17 +329,24 @@ async function scheduleAlerts(todays){
     if(p&&p.LocalNotifications){
       var r=await p.LocalNotifications.requestPermissions();
       if(r&&r.display==='granted'){
-        await p.LocalNotifications.cancel({notifications:[{id:7}]});
+        try{ await p.LocalNotifications.cancel({notifications:[{id:7},{id:BDAY_ID}]}); }catch(e){}
+        try{
+          await p.LocalNotifications.createChannel({
+            id:BDAY_CH, name:'Birthday reminders',
+            description:'Heads-up reminder of whose birthday it is today',
+            importance:5, visibility:1, vibration:true
+          });
+        }catch(e){}
         if(todays.length){
           await p.LocalNotifications.schedule({notifications:[{
-            id:7, title:'🎂 Birthdays today',
-            body:todays.map(function(x){return x.p.name;}).join(', '),
+            id:BDAY_ID, channelId:BDAY_CH,
+            title:bdayAlertTitle(todays), body:bdayAlertBody(todays),
             schedule:{on:{hour:8,minute:0},repeats:true,allowWhileIdle:true}
           }]});
         }
       }
     } else if('Notification' in window && todays.length && Notification.permission==='granted'){
-      try{ new Notification('🎂 Birthdays today',{body:todays.map(function(x){return x.p.name;}).join(', ')}); }catch(e){}
+      try{ new Notification(bdayAlertTitle(todays),{body:bdayAlertBody(todays)}); }catch(e){}
     }
   }catch(e){}
 }
